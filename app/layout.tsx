@@ -8,9 +8,8 @@ export const metadata: Metadata = {
 }
 
 const NAV_SITES = [
-  { label: 'Spend',  href: 'https://spendverdict.com',  color: '#7c3aed' },
-  { label: 'Comp',   href: 'https://compverdict.com',   color: '#2563eb' },
-  { label: 'Salary', href: 'https://salaryverdict.com', color: '#0891b2' },
+  { label: 'Spend', href: 'https://spendverdict.com', color: '#7c3aed' },
+  { label: 'Comp',  href: 'https://compverdict.com',  color: '#2563eb' },
 ]
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
