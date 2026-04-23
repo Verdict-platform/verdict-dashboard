@@ -60,6 +60,7 @@ function EmptyState() {
         >
           Check your comp →
         </a>
+
       </div>
     </div>
   )
@@ -333,6 +334,13 @@ export default function DashboardClient() {
   const [loading, setLoading]   = useState(true)
 
   useEffect(() => {
+    // Canonical dashboard is dashboard.spendverdict.com
+    // Any other subdomain redirects here, preserving ?uid= so UUIDs accumulate in one place
+    if (typeof window !== 'undefined' && window.location.hostname !== 'dashboard.spendverdict.com' && window.location.hostname !== 'localhost') {
+      window.location.replace(`https://dashboard.spendverdict.com${window.location.search}`)
+      return
+    }
+
     const uid = getOrCreateUid('spend')
     if (!uid) { setLoading(false); return }
     getAllEntries(uid).then(data => {
