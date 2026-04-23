@@ -13,7 +13,8 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import type { VerdictEntry, VerdictProfile, VerdictSiteId } from './types'
 
-const UID_KEY = 'verdict_uid'
+const UID_KEY  = 'verdict_uid'
+const UIDS_KEY = 'verdict_uids' // all UUIDs ever seen on this browser — dashboard queries all of them
 
 // Lazily initialised — safe to import in SSR contexts
 let _client: SupabaseClient | null = null
@@ -33,6 +34,29 @@ function isValidUuid(s: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s)
 }
 
+function rememberUid(uid: string): void {
+  try {
+    const existing: string[] = JSON.parse(localStorage.getItem(UIDS_KEY) ?? '[]')
+    if (!existing.includes(uid)) {
+      existing.push(uid)
+      localStorage.setItem(UIDS_KEY, JSON.stringify(existing))
+    }
+  } catch {}
+}
+
+/** All UUIDs this browser has ever used — used by the dashboard to query across split sessions. */
+export function getKnownUids(): string[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const primary = localStorage.getItem(UID_KEY)
+    const all: string[] = JSON.parse(localStorage.getItem(UIDS_KEY) ?? '[]')
+    if (primary && !all.includes(primary)) all.push(primary)
+    return all.filter(isValidUuid)
+  } catch {
+    return []
+  }
+}
+
 /**
  * Returns the user's UUID, resolving in priority order:
  *   1. ?uid= URL param  (cross-site handoff — absorb and clean from URL)
@@ -49,6 +73,7 @@ export function getOrCreateUid(siteId: VerdictSiteId): string {
   const incoming = params.get('uid')
   if (incoming && isValidUuid(incoming)) {
     localStorage.setItem(UID_KEY, incoming)
+    rememberUid(incoming)
     params.delete('uid')
     const clean = params.toString()
       ? `${window.location.pathname}?${params}`
@@ -59,11 +84,15 @@ export function getOrCreateUid(siteId: VerdictSiteId): string {
 
   // 2. Already stored locally
   const stored = localStorage.getItem(UID_KEY)
-  if (stored && isValidUuid(stored)) return stored
+  if (stored && isValidUuid(stored)) {
+    rememberUid(stored)
+    return stored
+  }
 
   // 3. First visit — generate and persist (profile created on first saveEntry)
   const uid = crypto.randomUUID()
   localStorage.setItem(UID_KEY, uid)
+  rememberUid(uid)
   return uid
 }
 
@@ -130,10 +159,13 @@ export async function saveEntry(
 // ─── Reads ────────────────────────────────────────────────────────────────────
 
 export async function getAllEntries(uid: string): Promise<VerdictEntry[]> {
+  const uids = getKnownUids()
+  const queryUids = uids.length > 0 ? uids : [uid]
+
   const { data } = await getClient()
     .from('verdict_entries')
     .select('*')
-    .eq('profile_id', uid)
+    .in('profile_id', queryUids)
     .order('created_at', { ascending: false })
 
   return data ?? []
