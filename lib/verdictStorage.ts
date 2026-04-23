@@ -61,10 +61,9 @@ export function getOrCreateUid(siteId: VerdictSiteId): string {
   const stored = localStorage.getItem(UID_KEY)
   if (stored && isValidUuid(stored)) return stored
 
-  // 3. First visit — generate and persist
+  // 3. First visit — generate and persist (profile created on first saveEntry)
   const uid = crypto.randomUUID()
   localStorage.setItem(UID_KEY, uid)
-  void createProfile(uid, siteId)
   return uid
 }
 
@@ -87,26 +86,11 @@ export function withUid(url: string): string {
   return `${url}${url.includes('?') ? '&' : '?'}uid=${uid}`
 }
 
-// ─── Profile ──────────────────────────────────────────────────────────────────
-
-async function createProfile(uid: string, siteId: VerdictSiteId): Promise<void> {
-  await getClient()
-    .from('verdict_profiles')
-    .insert({ id: uid, first_site: siteId } satisfies Omit<VerdictProfile, 'created_at'>)
-}
-
 // ─── Writes ───────────────────────────────────────────────────────────────────
 
 /**
  * Persist a calculator result. Call after the user clicks "Track this".
- *
- * @param uid          from getOrCreateUid()
- * @param type         calculator that produced the result
- * @param city         human city name  (e.g. "London")
- * @param annualSalary raw number, always annual
- * @param currency     ISO code         (e.g. "GBP")
- * @param input        full calculator input object
- * @param output       full calculator output object
+ * Upserts the profile first to avoid FK race condition on first save.
  */
 export async function saveEntry(
   uid: string,
@@ -117,6 +101,11 @@ export async function saveEntry(
   input: unknown,
   output: unknown,
 ): Promise<{ id: string } | null> {
+  // Ensure profile row exists before inserting entry (FK constraint)
+  await getClient()
+    .from('verdict_profiles')
+    .upsert({ id: uid, first_site: type }, { onConflict: 'id', ignoreDuplicates: true })
+
   const { data, error } = await getClient()
     .from('verdict_entries')
     .insert({
