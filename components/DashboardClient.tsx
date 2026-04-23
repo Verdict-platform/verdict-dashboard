@@ -5,6 +5,12 @@ import { getOrCreateUid, getAllEntries, withUid } from '@/lib/verdictStorage'
 import { generateInsights, type VerdictInsight } from '@/lib/insightEngine'
 import type { SpendEntry, CompEntry, VerdictEntry } from '@/lib/types'
 
+function trackEvent(name: string, params?: Record<string, string | number | boolean>) {
+  if (typeof window === 'undefined') return
+  const gtag = (window as any).gtag
+  if (typeof gtag === 'function') gtag('event', name, params ?? {})
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmt(n: number, currency: string): string {
@@ -346,6 +352,13 @@ export default function DashboardClient() {
     getAllEntries(uid).then(data => {
       setEntries(data)
       setLoading(false)
+      const hasSpend = data.some(e => e.type === 'spend')
+      const hasComp  = data.some(e => e.type === 'comp')
+      if (data.length === 0) {
+        trackEvent('dashboard_empty')
+      } else {
+        trackEvent('dashboard_viewed', { entry_count: data.length, has_spend: hasSpend, has_comp: hasComp })
+      }
     })
   }, [])
 

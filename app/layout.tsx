@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Script from 'next/script'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -15,6 +16,15 @@ const NAV_SITES = [
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
+      <head>
+        <Script src="https://www.googletagmanager.com/gtag/js?id=G-L2CHSFHMMR" strategy="afterInteractive" />
+        <Script id="ga4-init" strategy="afterInteractive">{`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-L2CHSFHMMR');
+        `}</Script>
+      </head>
       <body className="bg-gray-50 text-gray-900 min-h-screen font-sans antialiased">
         <header className="bg-white border-b border-gray-100 sticky top-0 z-50">
           <div className="max-w-2xl mx-auto px-4 h-12 flex items-center justify-between">
